@@ -24,10 +24,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# 把 kiro-gateway 加入 path（append 而非 insert，避免覆盖当前目录的 main 模块）
-KIRO_GW_PATH = str(Path(__file__).parent.parent / "kiro-gateway")
-if KIRO_GW_PATH not in sys.path:
-    sys.path.append(KIRO_GW_PATH)
 
 from kiro.cache import ModelInfoCache
 from kiro.auth import AuthType

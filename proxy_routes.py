@@ -5,18 +5,13 @@ Proxy Routes — 用户请求转发到 Kiro API（完整管线）。
 支持 combo 映射和模型别名解析。
 """
 
-import sys
 import json
 import time
-from pathlib import Path
 
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from loguru import logger
 
-KIRO_GW_PATH = str(Path(__file__).parent.parent / "kiro-gateway")
-if KIRO_GW_PATH not in sys.path:
-    sys.path.append(KIRO_GW_PATH)
 
 from kiro.converters_openai import build_kiro_payload
 from kiro.streaming_openai import stream_kiro_to_openai, collect_stream_response

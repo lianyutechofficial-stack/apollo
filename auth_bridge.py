@@ -4,18 +4,12 @@ Auth Bridge — 为 token 池中的每个凭证创建独立的 KiroAuthManager�
 每个 token 有自己的 auth manager 实例，独立刷新，互不影响。
 """
 
-import sys
 import json
 import tempfile
-from pathlib import Path
 from typing import Dict, Optional, Any
 
 from loguru import logger
 
-# 把 kiro-gateway 加入 path，复用其认证逻辑
-KIRO_GW_PATH = Path(__file__).parent.parent / "kiro-gateway"
-if str(KIRO_GW_PATH) not in sys.path:
-    sys.path.append(str(KIRO_GW_PATH))
 
 from kiro.auth import KiroAuthManager
 from kiro.config import get_kiro_api_host, get_kiro_q_host
