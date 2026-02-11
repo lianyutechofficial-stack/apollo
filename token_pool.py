@@ -702,3 +702,71 @@ class TokenPool:
                 user_name, datetime.now(timezone.utc), r["id"],
             )
             return self._row_to_cursor_token(r)
+
+    # ── Promax 激活码管理 ──
+
+    async def add_promax_key(self, api_key: str, note: str = "") -> Dict:
+        tid = secrets.token_hex(8)
+        now = datetime.now(timezone.utc)
+        async with self._pool.acquire() as conn:
+            existing = await conn.fetchrow("SELECT id FROM promax_keys WHERE api_key = $1", api_key)
+            if existing:
+                await conn.execute(
+                    "UPDATE promax_keys SET note=$1, status='active' WHERE id=$2",
+                    note, existing["id"],
+                )
+                return {"id": existing["id"], "api_key": api_key, "note": note, "updated": True}
+            await conn.execute(
+                """INSERT INTO promax_keys (id, api_key, note, status, added_at, use_count)
+                   VALUES ($1,$2,$3,'active',$4,0)""",
+                tid, api_key, note, now,
+            )
+        return {"id": tid, "api_key": api_key, "note": note, "addedAt": now.isoformat()}
+
+    async def list_promax_keys(self):
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch("SELECT * FROM promax_keys ORDER BY added_at")
+        result = []
+        for r in rows:
+            result.append({
+                "id": r["id"], "api_key": r["api_key"], "note": r["note"] or "",
+                "status": r["status"], "assigned_user": r["assigned_user"] or "",
+                "addedAt": r["added_at"].isoformat() if r["added_at"] else "",
+                "useCount": r["use_count"] or 0,
+            })
+        return result
+
+    async def remove_promax_key(self, key_id: str) -> bool:
+        async with self._pool.acquire() as conn:
+            res = await conn.execute("DELETE FROM promax_keys WHERE id = $1", key_id)
+        return res == "DELETE 1"
+
+    async def assign_promax_key(self, key_id: str, user_name: str) -> bool:
+        now = datetime.now(timezone.utc)
+        async with self._pool.acquire() as conn:
+            res = await conn.execute(
+                "UPDATE promax_keys SET assigned_user = $1, last_used = $2 WHERE id = $3",
+                user_name, now, key_id,
+            )
+        return res == "UPDATE 1"
+
+    async def get_promax_key_for_user(self, user_name: str) -> Optional[str]:
+        """获取分配给用户的激活码。优先已分配的，否则取使用最少的。"""
+        async with self._pool.acquire() as conn:
+            r = await conn.fetchrow(
+                "SELECT api_key FROM promax_keys WHERE assigned_user = $1 AND status = 'active'",
+                user_name,
+            )
+            if r:
+                return r["api_key"]
+            # 自动分配使用最少的
+            r = await conn.fetchrow(
+                "SELECT id, api_key FROM promax_keys WHERE status = 'active' ORDER BY use_count ASC LIMIT 1",
+            )
+            if r:
+                await conn.execute(
+                    "UPDATE promax_keys SET assigned_user = $1, last_used = $2, use_count = use_count + 1 WHERE id = $3",
+                    user_name, datetime.now(timezone.utc), r["id"],
+                )
+                return r["api_key"]
+        return None

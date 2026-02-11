@@ -381,31 +381,36 @@ async def extract_kiro_config(request: Request):
             "source": source, "token_id": entry["id"]}
 
 
-@admin_router.get("/cursor-tokens", dependencies=[Depends(verify_admin)])
-async def list_cursor_tokens(request: Request):
-    return {"tokens": await request.app.state.pool.list_cursor_tokens()}
+# ── Promax 激活码管理 ──
+
+@admin_router.get("/promax-keys", dependencies=[Depends(verify_admin)])
+async def list_promax_keys(request: Request):
+    return {"keys": await request.app.state.pool.list_promax_keys()}
 
 
-@admin_router.post("/cursor-tokens", dependencies=[Depends(verify_admin)])
-async def add_cursor_token(request: Request):
+@admin_router.post("/promax-keys", dependencies=[Depends(verify_admin)])
+async def add_promax_key(request: Request):
     body = await request.json()
-    entry = await request.app.state.pool.add_cursor_token(body)
-    return {"token": entry}
+    api_key = body.get("api_key", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="api_key is required")
+    r = await request.app.state.pool.add_promax_key(api_key, body.get("note", ""))
+    return r
 
 
-@admin_router.delete("/cursor-tokens/{token_id}", dependencies=[Depends(verify_admin)])
-async def remove_cursor_token(request: Request, token_id: str):
-    ok = await request.app.state.pool.remove_cursor_token(token_id)
+@admin_router.delete("/promax-keys/{key_id}", dependencies=[Depends(verify_admin)])
+async def remove_promax_key(request: Request, key_id: str):
+    ok = await request.app.state.pool.remove_promax_key(key_id)
     if not ok:
-        raise HTTPException(status_code=404, detail="Cursor token not found")
+        raise HTTPException(status_code=404, detail="Key not found")
     return {"ok": True}
 
 
-@admin_router.put("/cursor-tokens/{token_id}/assign", dependencies=[Depends(verify_admin)])
-async def assign_cursor_token(request: Request, token_id: str):
+@admin_router.put("/promax-keys/{key_id}/assign", dependencies=[Depends(verify_admin)])
+async def assign_promax_key(request: Request, key_id: str):
     body = await request.json()
     user_name = body.get("user_name", "")
-    ok = await request.app.state.pool.assign_cursor_token(token_id, user_name)
+    ok = await request.app.state.pool.assign_promax_key(key_id, user_name)
     if not ok:
-        raise HTTPException(status_code=404, detail="Cursor token not found")
+        raise HTTPException(status_code=404, detail="Key not found")
     return {"ok": True}

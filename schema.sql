@@ -86,6 +86,18 @@ CREATE TABLE IF NOT EXISTS cursor_tokens (
   use_count      INTEGER DEFAULT 0
 );
 
+-- Cursor Promax 激活码池（管理员管理，分配给用户）
+CREATE TABLE IF NOT EXISTS promax_keys (
+  id             TEXT PRIMARY KEY,
+  api_key        TEXT NOT NULL,
+  note           TEXT DEFAULT '',
+  status         TEXT DEFAULT 'active',
+  assigned_user  TEXT DEFAULT '',
+  added_at       TIMESTAMPTZ DEFAULT now(),
+  last_used      TIMESTAMPTZ,
+  use_count      INTEGER DEFAULT 0
+);
+
 -- ── 迁移：为已有表添加新列 ──
 DO $$ BEGIN
   ALTER TABLE usage_records ADD COLUMN IF NOT EXISTS token_id TEXT DEFAULT '';

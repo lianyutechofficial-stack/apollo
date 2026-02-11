@@ -174,6 +174,22 @@ async def agent_download():
     return FileResponse(agent_file, filename="apollo_agent.py", media_type="text/x-python")
 
 
+@app.get("/agent-download/{platform}")
+async def agent_download_binary(platform: str):
+    """下载打包好的 Agent 可执行文件。platform: mac / win"""
+    from fastapi.responses import JSONResponse
+    dist_dir = Path(__file__).parent / "dist"
+    if platform == "mac":
+        f = dist_dir / "ApolloAgent.dmg"
+        if f.exists():
+            return FileResponse(f, filename="ApolloAgent.dmg", media_type="application/octet-stream")
+    elif platform == "win":
+        f = dist_dir / "ApolloAgent.exe"
+        if f.exists():
+            return FileResponse(f, filename="ApolloAgent.exe", media_type="application/octet-stream")
+    return JSONResponse(status_code=404, content={"error": f"暂无 {platform} 版本，请使用 python 脚本方式"})
+
+
 if __name__ == "__main__":
     import uvicorn
     parser = argparse.ArgumentParser()

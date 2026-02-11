@@ -77,76 +77,11 @@ async def get_combos(request: Request):
     return {"combos": combos}
 
 
-@user_router.post("/cursor-claim")
-async def claim_cursor_token(request: Request):
-    """用户领取 Cursor Pro 凭证。返回完整 token 用于本地写入。"""
+@user_router.get("/cursor-activation")
+async def get_cursor_activation(request: Request):
+    """获取分配给当前用户的 Cursor 激活码。"""
     user = await _get_current_user(request)
-    token = await request.app.state.pool.claim_cursor_token(user["name"])
-    if not token:
-        raise HTTPException(status_code=404, detail="暂无可用的 Cursor 凭证，请联系管理员")
-    return {
-        "email": token["email"],
-        "accessToken": token["access_token"],
-        "refreshToken": token["refresh_token"],
-    }
-
-
-@user_router.post("/cursor-apply")
-async def apply_cursor_token(request: Request):
-    """
-    一键切换 Cursor Pro 账号（服务端执行）。
-
-    流程：领取凭证 → 关闭 Cursor → 写入 state.vscdb → 重新打开 Cursor。
-    自动检测操作系统，多路径扫描 + 注册表 + 系统命令兜底。
-    """
-    import asyncio
-    from cursor_utils import find_cursor_db, write_cursor_creds, kill_cursor, launch_cursor
-
-    user = await _get_current_user(request)
-    token = await request.app.state.pool.claim_cursor_token(user["name"])
-    if not token:
-        raise HTTPException(status_code=404, detail="暂无可用的 Cursor 凭证，请联系管理员")
-
-    email = token["email"]
-    access_token = token["access_token"]
-    refresh_token = token["refresh_token"]
-
-    # ── 多策略探测数据库路径 ──
-    db_path, tried = find_cursor_db()
-    if not db_path:
-        raise HTTPException(
-            status_code=500,
-            detail=f"未找到 Cursor 数据库，请确认 Cursor 已安装并至少启动过一次。\n"
-                   f"可设置环境变量 CURSOR_DB_PATH 手动指定。\n"
-                   f"已尝试路径:\n" + "\n".join(f"  · {p}" for p in tried),
-        )
-
-    steps = []
-
-    # 1. 关闭 Cursor
-    if kill_cursor():
-        steps.append("关闭 Cursor")
-    else:
-        steps.append("关闭 Cursor（部分）")
-    await asyncio.sleep(2)
-
-    # 2. 写入凭证
-    try:
-        write_cursor_creds(db_path, email, access_token, refresh_token)
-        steps.append(f"写入登录凭证 ({db_path.name})")
-        logger.info(f"Cursor credentials written for {email} -> {db_path}")
-    except Exception as e:
-        logger.error(f"写入 Cursor 数据库失败: {e}")
-        raise HTTPException(status_code=500, detail=f"写入 Cursor 数据库失败: {e}")
-
-    # 3. 重新打开 Cursor
-    ok, msg = launch_cursor()
-    steps.append(msg)
-
-    return {
-        "ok": True,
-        "email": email,
-        "steps": steps,
-        "message": f"已切换到 {email}",
-        "dbPath": str(db_path),
-    }
+    key = await request.app.state.pool.get_promax_key_for_user(user["name"])
+    if not key:
+        raise HTTPException(status_code=404, detail="暂无可用激活码，请联系管理员")
+    return {"activation_code": key}
