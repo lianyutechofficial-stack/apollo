@@ -85,3 +85,75 @@ async def get_cursor_activation(request: Request):
     if not key:
         raise HTTPException(status_code=404, detail="暂无可用激活码，请联系管理员")
     return {"activation_code": key}
+
+
+@user_router.post("/smart-switch")
+async def smart_switch(request: Request):
+    """
+    服务端换号：调 promax billing/request-switch 获取新号，
+    返回新账号凭证给网页端，网页端再传给本地 Agent 写入。
+    """
+    import httpx
+
+    user = await _get_current_user(request)
+    key = await request.app.state.pool.get_promax_key_for_user(user["name"])
+    if not key:
+        raise HTTPException(status_code=404, detail="暂无可用激活码")
+
+    promax_api = "http://api.cursorpromax.cn"
+    device_id = user["id"][:32]  # 用 user id 作为 device_id
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        # 方式1: billing/request-switch
+        try:
+            r = await client.post(f"{promax_api}/api/billing/request-switch", json={
+                "activation_code": key,
+                "device_id": device_id,
+                "reason": "quota_exhausted",
+            })
+            data = r.json()
+            if data.get("success") and data.get("switched") and data.get("new_account"):
+                account = data["new_account"]
+                logger.info(f"smart-switch OK via request-switch: {account.get('email')}")
+                return {"ok": True, "account": account}
+        except Exception as e:
+            logger.warning(f"request-switch failed: {e}")
+
+        # 方式2: billing/request-reassign
+        try:
+            r = await client.post(
+                f"{promax_api}/api/billing/request-reassign",
+                params={"activation_code": key, "device_id": device_id},
+                json={},
+            )
+            data = r.json()
+            if data.get("success") and data.get("account"):
+                account = data["account"]
+                logger.info(f"smart-switch OK via request-reassign: {account.get('email')}")
+                return {"ok": True, "account": account}
+        except Exception as e:
+            logger.warning(f"request-reassign failed: {e}")
+
+        # 方式3: fallback quick-switch（需要 activation_code_id）
+        try:
+            # 先激活拿 acid
+            r = await client.post(f"{promax_api}/api/activate", json={
+                "code": key, "device_id": device_id,
+                "device_name": "apollo-gateway", "plugin_version": "2.0.0-apollo",
+            })
+            act_data = r.json()
+            acid = act_data.get("data", {}).get("activation_code_id")
+            if acid:
+                r = await client.post(
+                    f"{promax_api}/api/quick-switch",
+                    params={"activation_code_id": str(acid), "device_id": device_id},
+                    json={},
+                )
+                data = r.json()
+                if data.get("success") and data.get("data"):
+                    logger.info(f"smart-switch OK via quick-switch: {data['data'].get('email')}")
+                    return {"ok": True, "account": data["data"]}
+        except Exception as e:
+            logger.warning(f"quick-switch fallback failed: {e}")
+
+    return {"ok": False, "error": "号池暂无可用账号，请稍后再试"}
