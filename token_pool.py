@@ -684,22 +684,17 @@ class TokenPool:
         return res == "UPDATE 1"
 
     async def claim_cursor_token(self, user_name: str):
-        """用户领取一个可用的 Cursor 凭证（优先已分配给自己的，否则取未分配的）。"""
+        """用户领取一个可用的 Cursor 凭证。同一凭证可被多人重复领取。"""
         async with self._pool.acquire() as conn:
             # 优先返回已分配给该用户的
             r = await conn.fetchrow(
                 "SELECT * FROM cursor_tokens WHERE assigned_user = $1 AND status = 'active'", user_name,
             )
-            if r:
-                await conn.execute(
-                    "UPDATE cursor_tokens SET last_used = $1, use_count = use_count + 1 WHERE id = $2",
-                    datetime.now(timezone.utc), r["id"],
+            if not r:
+                # 取使用次数最少的活跃凭证（不限是否已分配）
+                r = await conn.fetchrow(
+                    "SELECT * FROM cursor_tokens WHERE status = 'active' ORDER BY use_count ASC LIMIT 1",
                 )
-                return self._row_to_cursor_token(r)
-            # 取一个未分配的
-            r = await conn.fetchrow(
-                "SELECT * FROM cursor_tokens WHERE (assigned_user = '' OR assigned_user IS NULL) AND status = 'active' ORDER BY use_count ASC LIMIT 1",
-            )
             if not r:
                 return None
             await conn.execute(
