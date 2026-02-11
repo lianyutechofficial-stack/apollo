@@ -100,8 +100,36 @@ class TokenPool:
     # ── Token CRUD ──
 
     async def add_token(self, token_data):
-        tid = secrets.token_hex(8)
+        client_id_hash = token_data.get("clientIdHash", "")
         now = datetime.now(timezone.utc)
+
+        # 同 clientIdHash 的凭证已存在 → 更新
+        if client_id_hash:
+            async with self._pool.acquire() as conn:
+                existing = await conn.fetchrow(
+                    "SELECT id FROM tokens WHERE client_id_hash = $1", client_id_hash
+                )
+            if existing:
+                tid = existing["id"]
+                async with self._pool.acquire() as conn:
+                    await conn.execute(
+                        """UPDATE tokens SET refresh_token=$1, access_token=$2, expires_at=$3,
+                           region=$4, client_id=$5, client_secret=$6, auth_method=$7,
+                           provider=$8, profile_arn=$9, status='active'
+                           WHERE id=$10""",
+                        token_data.get("refreshToken", ""), token_data.get("accessToken", ""),
+                        token_data.get("expiresAt", ""), token_data.get("region", "us-east-1"),
+                        token_data.get("clientId", ""), token_data.get("clientSecret", ""),
+                        token_data.get("authMethod", ""), token_data.get("provider", ""),
+                        token_data.get("profileArn", ""), tid,
+                    )
+                logger.info(f"Token updated (same clientIdHash): id={tid}")
+                self._auth_cache.invalidate("all_tokens")
+                return {"id": tid, "status": "active", "addedAt": now.isoformat(),
+                        "useCount": 0, "updated": True, **token_data}
+
+        # 新凭证 → 插入
+        tid = secrets.token_hex(8)
         async with self._pool.acquire() as conn:
             await conn.execute(
                 """INSERT INTO tokens (id, refresh_token, access_token, expires_at, region,
@@ -110,7 +138,7 @@ class TokenPool:
                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'active',$12,0)""",
                 tid, token_data.get("refreshToken", ""), token_data.get("accessToken", ""),
                 token_data.get("expiresAt", ""), token_data.get("region", "us-east-1"),
-                token_data.get("clientIdHash", ""), token_data.get("clientId", ""),
+                client_id_hash, token_data.get("clientId", ""),
                 token_data.get("clientSecret", ""), token_data.get("authMethod", ""),
                 token_data.get("provider", ""), token_data.get("profileArn", ""), now,
             )
@@ -583,17 +611,40 @@ class TokenPool:
         }
 
     async def add_cursor_token(self, data: Dict) -> Dict:
-        tid = secrets.token_hex(8)
+        email = data.get("email", "")
         now = datetime.now(timezone.utc)
+
+        # 同 email 的凭证已存在 → 更新
+        if email:
+            async with self._pool.acquire() as conn:
+                existing = await conn.fetchrow(
+                    "SELECT id FROM cursor_tokens WHERE email = $1", email
+                )
+            if existing:
+                tid = existing["id"]
+                async with self._pool.acquire() as conn:
+                    await conn.execute(
+                        """UPDATE cursor_tokens SET access_token=$1, refresh_token=$2,
+                           note=$3, status='active' WHERE id=$4""",
+                        data.get("accessToken", ""), data.get("refreshToken", ""),
+                        data.get("note", ""), tid,
+                    )
+                logger.info(f"Cursor token updated (same email): id={tid} email={email}")
+                return {"id": tid, "email": email, "status": "active",
+                        "note": data.get("note", ""), "addedAt": now.isoformat(),
+                        "useCount": 0, "updated": True}
+
+        # 新凭证 → 插入
+        tid = secrets.token_hex(8)
         async with self._pool.acquire() as conn:
             await conn.execute(
                 """INSERT INTO cursor_tokens (id, email, access_token, refresh_token, note, status, added_at, use_count)
                    VALUES ($1,$2,$3,$4,$5,'active',$6,0)""",
-                tid, data.get("email", ""), data.get("accessToken", ""),
+                tid, email, data.get("accessToken", ""),
                 data.get("refreshToken", ""), data.get("note", ""), now,
             )
-        logger.info(f"Cursor token added: id={tid} email={data.get('email','')}")
-        return {"id": tid, "email": data.get("email", ""), "status": "active",
+        logger.info(f"Cursor token added: id={tid} email={email}")
+        return {"id": tid, "email": email, "status": "active",
                 "note": data.get("note", ""), "addedAt": now.isoformat(), "useCount": 0}
 
     async def list_cursor_tokens(self):
