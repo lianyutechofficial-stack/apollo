@@ -97,13 +97,10 @@ async def apply_cursor_token(request: Request):
     一键切换 Cursor Pro 账号（服务端执行）。
 
     流程：领取凭证 → 关闭 Cursor → 写入 state.vscdb → 重新打开 Cursor。
-    自动检测操作系统，适配 macOS / Windows / Linux。
+    自动检测操作系统，多路径扫描 + 注册表 + 系统命令兜底。
     """
     import asyncio
-    import platform
-    import subprocess
-    import sqlite3
-    from pathlib import Path
+    from cursor_utils import find_cursor_db, write_cursor_creds, kill_cursor, launch_cursor
 
     user = await _get_current_user(request)
     token = await request.app.state.pool.claim_cursor_token(user["name"])
@@ -114,81 +111,42 @@ async def apply_cursor_token(request: Request):
     access_token = token["access_token"]
     refresh_token = token["refresh_token"]
 
-    # ── 跨平台路径 ──
-    system = platform.system()
-    if system == "Darwin":
-        db_path = Path.home() / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
-    elif system == "Windows":
-        import os as _os
-        appdata = Path(_os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
-        db_path = appdata / "Cursor" / "User" / "globalStorage" / "state.vscdb"
-    else:
-        db_path = Path.home() / ".config" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
-
-    if not db_path.exists():
-        raise HTTPException(status_code=500, detail=f"未找到 Cursor 数据库: {db_path}\n请确认 Cursor 已安装并至少启动过一次")
+    # ── 多策略探测数据库路径 ──
+    db_path, tried = find_cursor_db()
+    if not db_path:
+        raise HTTPException(
+            status_code=500,
+            detail=f"未找到 Cursor 数据库，请确认 Cursor 已安装并至少启动过一次。\n"
+                   f"可设置环境变量 CURSOR_DB_PATH 手动指定。\n"
+                   f"已尝试路径:\n" + "\n".join(f"  · {p}" for p in tried),
+        )
 
     steps = []
 
-    # 1. 关闭 Cursor（跨平台）
-    try:
-        if system == "Darwin":
-            subprocess.run(["osascript", "-e", 'quit app "Cursor"'], capture_output=True, timeout=5)
-            await asyncio.sleep(1)
-            subprocess.run(["pkill", "-f", "Cursor Helper"], capture_output=True, timeout=3)
-            subprocess.run(["pkill", "-f", "Cursor.app"], capture_output=True, timeout=3)
-        elif system == "Windows":
-            subprocess.run(["taskkill", "/F", "/IM", "Cursor.exe"], capture_output=True, timeout=5)
-        else:
-            subprocess.run(["pkill", "-f", "cursor"], capture_output=True, timeout=5)
-        await asyncio.sleep(2)
+    # 1. 关闭 Cursor
+    if kill_cursor():
         steps.append("关闭 Cursor")
-    except Exception as e:
-        logger.warning(f"关闭 Cursor 时出错（可忽略）: {e}")
+    else:
         steps.append("关闭 Cursor（部分）")
+    await asyncio.sleep(2)
 
-    # 2. 写入凭证到 state.vscdb
+    # 2. 写入凭证
     try:
-        conn = sqlite3.connect(str(db_path))
-        cursor = conn.cursor()
-        for key, value in [
-            ("cursorAuth/accessToken", access_token),
-            ("cursorAuth/refreshToken", refresh_token),
-            ("cursorAuth/cachedEmail", email),
-            ("cursorAuth/cachedSignUpType", "Auth_0"),
-            ("cursorAuth/stripeMembershipType", "pro"),
-        ]:
-            cursor.execute("INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)", (key, value))
-        conn.commit()
-        conn.close()
-        steps.append("写入登录凭证")
-        logger.info(f"Cursor credentials written for {email}")
+        write_cursor_creds(db_path, email, access_token, refresh_token)
+        steps.append(f"写入登录凭证 ({db_path.name})")
+        logger.info(f"Cursor credentials written for {email} -> {db_path}")
     except Exception as e:
         logger.error(f"写入 Cursor 数据库失败: {e}")
         raise HTTPException(status_code=500, detail=f"写入 Cursor 数据库失败: {e}")
 
-    # 3. 重新打开 Cursor（跨平台）
-    try:
-        if system == "Darwin":
-            subprocess.Popen(["open", "-a", "Cursor"])
-        elif system == "Windows":
-            import os as _os
-            local = Path(_os.environ.get("LOCALAPPDATA", ""))
-            cursor_exe = local / "Programs" / "cursor" / "Cursor.exe"
-            if cursor_exe.exists():
-                subprocess.Popen([str(cursor_exe)])
-            else:
-                subprocess.Popen(["cmd", "/c", "start", "", "Cursor"], shell=False)
-        else:
-            subprocess.Popen(["cursor"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        steps.append("启动 Cursor")
-    except Exception as e:
-        logger.warning(f"启动 Cursor 失败: {e}")
-        steps.append("启动 Cursor 失败，请手动打开")
+    # 3. 重新打开 Cursor
+    ok, msg = launch_cursor()
+    steps.append(msg)
 
     return {
         "ok": True,
         "email": email,
         "steps": steps,
         "message": f"已切换到 {email}",
+        "dbPath": str(db_path),
     }

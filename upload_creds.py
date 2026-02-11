@@ -105,15 +105,33 @@ def upload_kiro():
 # ── Cursor 凭证提取 ──
 
 def get_cursor_db_path() -> Path:
-    """跨平台获取 Cursor state.vscdb 路径。"""
+    """跨平台获取 Cursor state.vscdb 路径（多策略扫描）。"""
+    try:
+        from cursor_utils import find_cursor_db
+        db_path, _ = find_cursor_db()
+        if db_path:
+            return db_path
+    except ImportError:
+        pass
+    # fallback: 直接扫描常见路径
     system = platform.system()
+    candidates = []
     if system == "Darwin":
-        return Path.home() / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
+        candidates.append(Path.home() / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb")
     elif system == "Windows":
-        appdata = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
-        return appdata / "Cursor" / "User" / "globalStorage" / "state.vscdb"
+        for env_key in ("APPDATA", "LOCALAPPDATA"):
+            base = os.environ.get(env_key)
+            if base:
+                candidates.append(Path(base) / "Cursor" / "User" / "globalStorage" / "state.vscdb")
+        candidates.append(Path.home() / "AppData" / "Roaming" / "Cursor" / "User" / "globalStorage" / "state.vscdb")
+        candidates.append(Path.home() / "AppData" / "Local" / "Cursor" / "User" / "globalStorage" / "state.vscdb")
     else:
-        return Path.home() / ".config" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
+        candidates.append(Path.home() / ".config" / "Cursor" / "User" / "globalStorage" / "state.vscdb")
+    for p in candidates:
+        if p.exists():
+            return p
+    # 返回第一个候选路径（即使不存在，让调用方报错）
+    return candidates[0] if candidates else Path("state.vscdb")
 
 
 def get_cursor_creds() -> dict | None:

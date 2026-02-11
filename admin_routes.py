@@ -271,17 +271,10 @@ async def grant_tokens(request: Request, user_id: str):
 # ── 本机配置提取 & Cursor Pro 凭证管理 ──
 
 def _get_cursor_db_path():
-    """跨平台获取 Cursor state.vscdb 路径。"""
-    import platform
-    from pathlib import Path
-    system = platform.system()
-    if system == "Darwin":
-        return Path.home() / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
-    elif system == "Windows":
-        appdata = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
-        return appdata / "Cursor" / "User" / "globalStorage" / "state.vscdb"
-    else:  # Linux
-        return Path.home() / ".config" / "Cursor" / "User" / "globalStorage" / "state.vscdb"
+    """跨平台获取 Cursor state.vscdb 路径（多策略扫描）。"""
+    from cursor_utils import find_cursor_db
+    db_path, _ = find_cursor_db()
+    return db_path
 
 
 def _get_kiro_cli_paths():
@@ -305,43 +298,32 @@ def _get_kiro_cli_paths():
 @admin_router.post("/extract/cursor", dependencies=[Depends(verify_admin)])
 async def extract_cursor_config(request: Request):
     """提取本机 Cursor 登录凭证并直接存入 Cursor 凭证池。"""
-    import sqlite3
+    from cursor_utils import find_cursor_db, read_cursor_creds
 
-    db_path = _get_cursor_db_path()
-    if not db_path.exists():
-        raise HTTPException(status_code=404, detail=f"未找到 Cursor 数据库: {db_path}")
+    creds = read_cursor_creds()
+    if not creds:
+        _, tried = find_cursor_db()
+        raise HTTPException(
+            status_code=404,
+            detail=f"未找到 Cursor 凭证。可能原因：Cursor 未安装、未登录、或数据库路径非标准。\n"
+                   f"可设置环境变量 CURSOR_DB_PATH 手动指定。\n"
+                   f"已尝试路径:\n" + "\n".join(f"  · {p}" for p in tried),
+        )
 
-    try:
-        conn = sqlite3.connect(str(db_path))
-        cur = conn.cursor()
-        kv = {}
-        for key in ["cursorAuth/accessToken", "cursorAuth/refreshToken", "cursorAuth/cachedEmail",
-                     "cursorAuth/stripeMembershipType"]:
-            cur.execute("SELECT value FROM ItemTable WHERE key = ?", (key,))
-            row = cur.fetchone()
-            kv[key.split("/")[-1]] = row[0] if row else ""
-        conn.close()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"读取 Cursor 数据库失败: {e}")
-
-    email = kv.get("cachedEmail", "")
-    access_token = kv.get("accessToken", "")
-    refresh_token = kv.get("refreshToken", "")
-    membership = kv.get("stripeMembershipType", "")
-
-    if not access_token and not refresh_token:
-        raise HTTPException(status_code=404, detail="本机 Cursor 未登录（无 token）")
+    email = creds["email"]
+    membership = creds["membership"]
 
     # 直接存入数据库
     pool = request.app.state.pool
     entry = await pool.add_cursor_token({
         "email": email,
-        "accessToken": access_token,
-        "refreshToken": refresh_token,
+        "accessToken": creds["accessToken"],
+        "refreshToken": creds["refreshToken"],
         "note": f"本机提取 · {membership}",
     })
 
-    return {"ok": True, "email": email, "membership": membership, "token_id": entry["id"]}
+    return {"ok": True, "email": email, "membership": membership, "token_id": entry["id"],
+            "dbPath": creds.get("dbPath", "")}
 
 
 @admin_router.post("/extract/kiro", dependencies=[Depends(verify_admin)])
