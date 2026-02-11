@@ -164,6 +164,16 @@ async def health():
     return {"status": "ok", "service": "apollo-gateway"}
 
 
+@app.get("/agent-download")
+async def agent_download():
+    """下载 apollo_agent.py 供用户本地运行。"""
+    agent_file = Path(__file__).parent / "apollo_agent.py"
+    if not agent_file.exists():
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=404, content={"error": "agent file not found"})
+    return FileResponse(agent_file, filename="apollo_agent.py", media_type="text/x-python")
+
+
 if __name__ == "__main__":
     import uvicorn
     parser = argparse.ArgumentParser()
