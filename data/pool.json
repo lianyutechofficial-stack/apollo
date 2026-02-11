@@ -1,0 +1,124 @@
+{
+  "tokens": [
+    {
+      "id": "f6d7c3949a9e8cfc",
+      "refreshToken": "aorAAAAAGoAI3QlGCxrb1_H2ZlpSGyeUISS4NC7CD4mHoEkRS7a8yE3TI6CyRO77J_B4pmWK1b1SvS56W9qsY5YgsBkc0:MGUCMANXYk4yJHG97SP1Ue3dovw9I5qCEsfBxnxOL+7JV6N3mS7Qp0amRLRLHeqGKxRj9AIxAI4ocfuSHkoWeTe2pceSDyoHDnxnjlH3LWtUYBFDtsv8zln5w+WQTMcPRHGNbHg2ew",
+      "accessToken": "aoaAAAAAGmLojc1zfefGLx6QRWeOyoyAbvlaU80cOWb75OOzQZ3B5wIMmKrbzB48AilTTdQs9XtByYX4Xbc-fwcZMBkc0:MGUCMHLGDjRMLUJui6LcaW4obVWroes9Vh4P72oR1Ta9KibukTHe6M2D8lDCYGqt18JzEQIxAIWgIZmoboYoKF0Oz3PvjehA629fNTNb4G/C+bW2YXVAZ70sRGY2aUlyp7K7wN2/vg",
+      "expiresAt": "2026-02-10T21:25:11.286Z",
+      "region": "us-east-1",
+      "clientIdHash": "947b4698b1b67cbe75c471e13bdf44d897872235",
+      "clientId": "",
+      "clientSecret": "",
+      "authMethod": "IdC",
+      "provider": "Enterprise",
+      "profileArn": "",
+      "status": "active",
+      "addedAt": "2026-02-10T21:51:20.769929+00:00",
+      "lastUsed": "2026-02-10T22:13:30.831539+00:00",
+      "useCount": 4
+    },
+    {
+      "id": "89f2a9e19a74f825",
+      "refreshToken": "aorAAAAAGoAI3QlGCxrb1_H2ZlpSGyeUISS4NC7CD4mHoEkRS7a8yE3TI6CyRO77J_B4pmWK1b1SvS56W9qsY5YgsBkc0:MGUCMANXYk4yJHG97SP1Ue3dovw9I5qCEsfBxnxOL+7JV6N3mS7Qp0amRLRLHeqGKxRj9AIxAI4ocfuSHkoWeTe2pceSDyoHDnxnjlH3LWtUYBFDtsv8zln5w+WQTMcPRHGNbHg2ew",
+      "accessToken": "aoaAAAAAGmLojc1zfefGLx6QRWeOyoyAbvlaU80cOWb75OOzQZ3B5wIMmKrbzB48AilTTdQs9XtByYX4Xbc-fwcZMBkc0:MGUCMHLGDjRMLUJui6LcaW4obVWroes9Vh4P72oR1Ta9KibukTHe6M2D8lDCYGqt18JzEQIxAIWgIZmoboYoKF0Oz3PvjehA629fNTNb4G/C+bW2YXVAZ70sRGY2aUlyp7K7wN2/vg",
+      "expiresAt": "2026-02-10T21:25:11.286Z",
+      "region": "us-east-1",
+      "clientIdHash": "947b4698b1b67cbe75c471e13bdf44d897872235",
+      "clientId": "",
+      "clientSecret": "",
+      "authMethod": "IdC",
+      "provider": "Enterprise",
+      "profileArn": "",
+      "status": "active",
+      "addedAt": "2026-02-10T21:54:41.748471+00:00",
+      "lastUsed": "2026-02-10T22:13:49.164477+00:00",
+      "useCount": 3
+    },
+    {
+      "id": "1ba6e910b99434ab",
+      "refreshToken": "aorAAAAAGoAI3QlGCxrb1_H2ZlpSGyeUISS4NC7CD4mHoEkRS7a8yE3TI6CyRO77J_B4pmWK1b1SvS56W9qsY5YgsBkc0:MGUCMANXYk4yJHG97SP1Ue3dovw9I5qCEsfBxnxOL+7JV6N3mS7Qp0amRLRLHeqGKxRj9AIxAI4ocfuSHkoWeTe2pceSDyoHDnxnjlH3LWtUYBFDtsv8zln5w+WQTMcPRHGNbHg2ew",
+      "accessToken": "aoaAAAAAGmLojc1zfefGLx6QRWeOyoyAbvlaU80cOWb75OOzQZ3B5wIMmKrbzB48AilTTdQs9XtByYX4Xbc-fwcZMBkc0:MGUCMHLGDjRMLUJui6LcaW4obVWroes9Vh4P72oR1Ta9KibukTHe6M2D8lDCYGqt18JzEQIxAIWgIZmoboYoKF0Oz3PvjehA629fNTNb4G/C+bW2YXVAZ70sRGY2aUlyp7K7wN2/vg",
+      "expiresAt": "2026-02-10T21:25:11.286Z",
+      "region": "us-east-1",
+      "clientIdHash": "947b4698b1b67cbe75c471e13bdf44d897872235",
+      "clientId": "",
+      "clientSecret": "",
+      "authMethod": "IdC",
+      "provider": "Enterprise",
+      "profileArn": "",
+      "status": "active",
+      "addedAt": "2026-02-10T21:55:01.370447+00:00",
+      "lastUsed": "2026-02-10T22:14:24.642127+00:00",
+      "useCount": 3
+    }
+  ],
+  "users": [
+    {
+      "id": "464eeef0a5813a7a",
+      "name": "theodore",
+      "usertoken": "apollo-d1cc3185b1cc3908",
+      "apikeys": [
+        "ap-3318cec9cc23aa01"
+      ],
+      "status": "active",
+      "createdAt": "2026-02-10T21:51:20.901445+00:00",
+      "lastUsed": null,
+      "requestCount": 0,
+      "usage": {
+        "total_prompt_tokens": 0,
+        "total_completion_tokens": 0,
+        "total_tokens": 0,
+        "by_model": {},
+        "by_date": {}
+      },
+      "quota": {
+        "daily_tokens": 0,
+        "monthly_tokens": 0,
+        "daily_requests": 0
+      },
+      "token_balance": 0,
+      "token_granted": 0
+    },
+    {
+      "id": "e45cb93462b806c0",
+      "name": "theodore",
+      "usertoken": "apollo-e8929e9220f5c458",
+      "apikeys": [
+        "ap-8329930f62403c69"
+      ],
+      "status": "active",
+      "createdAt": "2026-02-10T21:55:12.153219+00:00",
+      "lastUsed": "2026-02-10T22:14:24.642887+00:00",
+      "requestCount": 10,
+      "usage": {
+        "total_prompt_tokens": 7330,
+        "total_completion_tokens": 234,
+        "total_tokens": 7564,
+        "by_model": {
+          "claude-haiku-4.5": {
+            "prompt": 7330,
+            "completion": 234,
+            "requests": 3
+          }
+        },
+        "by_date": {
+          "2026-02-10": {
+            "prompt": 7330,
+            "completion": 234,
+            "requests": 3
+          }
+        }
+      },
+      "quota": {
+        "daily_tokens": 0,
+        "monthly_tokens": 0,
+        "daily_requests": 0
+      },
+      "token_balance": 97506,
+      "token_granted": 600000
+    }
+  ],
+  "admin_key": "admin-d937cdd13dd8dbf33c5c9c05ae4f1b5d",
+  "combos": {},
+  "aliases": {}
+}
