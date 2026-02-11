@@ -184,25 +184,49 @@ def launch_cursor() -> str:
         return str(e)
 
 
+def clear_cursor_auth(db_path: Path) -> None:
+    """
+    清除所有 Cursor 认证字段（设为空字符串）。
+    参考 cursor-promax 插件的 clearCursorAuthFromLocal 实现。
+    必须在写入新凭证之前调用，否则 Cursor 会读取缓存的旧 token。
+    """
+    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+    keys_to_clear = [
+        "cursorAuth/accessToken",
+        "cursorAuth/refreshToken",
+        "cursorAuth/workosSessionToken",
+        "cursorAuth/userId",
+        "cursorAuth/email",
+        "cursorAuth/cachedEmail",
+        "cursorAuth/stripeMembershipType",
+        "cursorAuth/sign_up_type",
+        "cursorAuth/cachedSignUpType",
+        "cursorAuth/stripeSubscriptionStatus",
+    ]
+    for key in keys_to_clear:
+        cur.execute("INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)", (key, ""))
+    conn.commit()
+    conn.close()
+
+
 def write_creds(db_path: Path, email: str, access_token: str, refresh_token: str) -> None:
     """
-    写入 Cursor 登录凭证。
-
-    Cursor 当前版本使用 WorkOS 认证，核心字段是 workosSessionToken。
-    同时兼容写入旧版字段（accessToken/refreshToken）以防回退。
+    写入 Cursor 登录凭证。先清除所有旧认证字段，再写入新凭证。
 
     access_token 可能是：
     - WorkOS session token（格式: userId::jwt）→ 写入 workosSessionToken
     - 纯 JWT / 旧版 token → 写入 accessToken
     """
+    # 第一步：清除所有旧认证字段
+    clear_cursor_auth(db_path)
+
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
 
-    # 判断是否是 WorkOS 格式（包含 :: 分隔的 userId 和 jwt）
     is_workos = "::" in access_token or "%3A%3A" in access_token
 
     if is_workos:
-        # 解析 userId
         if "%3A%3A" in access_token:
             user_id = access_token.split("%3A%3A")[0]
         else:
@@ -215,22 +239,23 @@ def write_creds(db_path: Path, email: str, access_token: str, refresh_token: str
             ("cursorAuth/cachedEmail", email),
             ("cursorAuth/stripeMembershipType", "pro"),
             ("cursorAuth/stripeSubscriptionStatus", "active"),
+            ("cursorAuth/sign_up_type", "Auth_0"),
             ("cursorAuth/cachedSignUpType", "Auth_0"),
         ]
     else:
-        # 旧版格式 fallback
         entries = [
             ("cursorAuth/accessToken", access_token),
             ("cursorAuth/refreshToken", refresh_token),
             ("cursorAuth/cachedEmail", email),
             ("cursorAuth/email", email),
+            ("cursorAuth/sign_up_type", "Auth_0"),
             ("cursorAuth/cachedSignUpType", "Auth_0"),
             ("cursorAuth/stripeMembershipType", "pro"),
             ("cursorAuth/stripeSubscriptionStatus", "active"),
         ]
 
     for key, value in entries:
-        if value:  # 只写非空值
+        if value:
             cur.execute("INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)", (key, value))
 
     conn.commit()
@@ -258,10 +283,10 @@ def do_switch(data: dict) -> dict:
     steps.append(f"关闭 Cursor: {r}")
     time.sleep(2)
 
-    # 3. 写入凭证
+    # 3. 写入凭证（先清除旧的，再写入新的）
     try:
         write_creds(db_path, email, access_token, refresh_token)
-        steps.append("写入凭证成功")
+        steps.append("清除旧凭证 + 写入新凭证成功")
     except Exception as e:
         return {"ok": False, "error": f"写入数据库失败: {e}", "steps": steps}
 

@@ -314,17 +314,44 @@ def read_cursor_creds() -> Optional[dict]:
     }
 
 
+def clear_cursor_auth(db_path: Path) -> None:
+    """
+    清除所有 Cursor 认证字段（设为空字符串）。
+    参考 cursor-promax 插件的 clearCursorAuthFromLocal 实现。
+    必须在写入新凭证之前调用，否则 Cursor 会读取缓存的旧 token。
+    """
+    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+    keys_to_clear = [
+        "cursorAuth/accessToken",
+        "cursorAuth/refreshToken",
+        "cursorAuth/workosSessionToken",
+        "cursorAuth/userId",
+        "cursorAuth/email",
+        "cursorAuth/cachedEmail",
+        "cursorAuth/stripeMembershipType",
+        "cursorAuth/sign_up_type",
+        "cursorAuth/cachedSignUpType",
+        "cursorAuth/stripeSubscriptionStatus",
+    ]
+    for key in keys_to_clear:
+        cur.execute("INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)", (key, ""))
+    conn.commit()
+    conn.close()
+    logger.debug(f"Cleared all cursorAuth fields in {db_path}")
+
+
 def write_cursor_creds(db_path: Path, email: str, access_token: str, refresh_token: str) -> None:
     """
-    写入凭证到 Cursor state.vscdb。失败抛异常。
-
-    Cursor 当前版本使用 WorkOS 认证，核心字段是 workosSessionToken。
-    同时兼容写入旧版字段以防版本回退。
+    写入凭证到 Cursor state.vscdb。先清除所有旧认证字段，再写入新凭证。
 
     access_token 可能是：
     - WorkOS session token（格式: userId::jwt 或 userId%3A%3Ajwt）→ 写入 workosSessionToken
     - 纯 JWT / 旧版 token → 写入 accessToken
     """
+    # 第一步：清除所有旧认证字段
+    clear_cursor_auth(db_path)
+
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
 
@@ -343,6 +370,7 @@ def write_cursor_creds(db_path: Path, email: str, access_token: str, refresh_tok
             ("cursorAuth/cachedEmail", email),
             ("cursorAuth/stripeMembershipType", "pro"),
             ("cursorAuth/stripeSubscriptionStatus", "active"),
+            ("cursorAuth/sign_up_type", "Auth_0"),
             ("cursorAuth/cachedSignUpType", "Auth_0"),
         ]
     else:
@@ -351,6 +379,7 @@ def write_cursor_creds(db_path: Path, email: str, access_token: str, refresh_tok
             ("cursorAuth/refreshToken", refresh_token),
             ("cursorAuth/cachedEmail", email),
             ("cursorAuth/email", email),
+            ("cursorAuth/sign_up_type", "Auth_0"),
             ("cursorAuth/cachedSignUpType", "Auth_0"),
             ("cursorAuth/stripeMembershipType", "pro"),
             ("cursorAuth/stripeSubscriptionStatus", "active"),
