@@ -173,12 +173,43 @@ def promax_get_account() -> dict:
 
 
 def promax_quick_switch() -> dict:
+    """
+    智能换号：优先用 billing/request-switch（真正从号池换新号），
+    失败时 fallback 到 billing/request-reassign，
+    最后 fallback 到 quick-switch。
+    """
     cfg = load_config()
     acid = cfg.get("activation_code_id")
+    code = cfg.get("activation_code", "")
     if not acid:
         return {"ok": False, "error": "未激活，请先设置激活码"}
     api_url = _get_promax_api_url()
     device_id = _get_device_id()
+
+    # 方式1: billing/request-switch（插件原生换号 API）
+    if code:
+        try:
+            r = _http_post(f"{api_url}/api/billing/request-switch", data={
+                "activation_code": code,
+                "device_id": device_id,
+                "reason": "quota_exhausted",
+            })
+            if r.get("success") and r.get("switched") and r.get("new_account"):
+                return {"ok": True, "account": r["new_account"]}
+        except Exception:
+            pass
+
+        # 方式2: billing/request-reassign
+        try:
+            r = _http_post(f"{api_url}/api/billing/request-reassign", params={
+                "activation_code": code, "device_id": device_id,
+            })
+            if r.get("success") and r.get("account"):
+                return {"ok": True, "account": r["account"]}
+        except Exception:
+            pass
+
+    # 方式3: fallback 到旧的 quick-switch
     r = _http_post(f"{api_url}/api/quick-switch", params={
         "activation_code_id": acid, "device_id": device_id,
     })
